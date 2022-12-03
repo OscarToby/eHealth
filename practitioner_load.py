@@ -1,3 +1,5 @@
+EXCLUDED_SPECIALTIES = ('', '207', '208', '209', '668', '670', '671', '672')
+
 class RowHICFile:
 
     def __init__(self,input_row: str):
@@ -6,6 +8,7 @@ class RowHICFile:
         self.first_name = input_row[30:50].strip().capitalize()
         self.middle_name = input_row[50:70].strip().capitalize()
         self.identifier_value = input_row[70:78]
+        self.practitioner_code = self.identifier_value[:6]
         self.address_line_1 = input_row[78:105].strip()
         self.address_line_2 = input_row[105:129].strip()
         self.suburb = input_row[129:145].strip()
@@ -40,14 +43,15 @@ class RowHICFile:
             'Surname',
             'Phone',
             'Email',
-            'Specialties',
-            'Invoicing',
+            'Specialities',
+            'Invoicing Level',
             'Reporting Provider',
             'Associated Domain User',
             'Is Contracted'
         ])
 
     def write_row_practitioner(self):
+        specialty = ','.join([str(int(s)) for s in self.practitioner_specialties.split(',') if s not in EXCLUDED_SPECIALTIES])
         return ','.join([
             self.identifier_value[:-2],
             '', # expiry date
@@ -56,12 +60,19 @@ class RowHICFile:
             self.last_name,
             '', # phone
             '', # email
-            f'"{self.practitioner_specialties}"',
+            f'"{specialty}"',
             'NONE', # invoicing
             'N', # reporting provider
             '', # associated domain user
             'N', # is contracted
         ])
+    
+    def has_valid_specialties(self):
+        if self.practitioner_specialties == '':
+            return False
+        if any([s for s in self.practitioner_specialties.split(',') if s not in EXCLUDED_SPECIALTIES]):
+            return True
+        return False
 
     @staticmethod
     def write_row_practitioner_location_header():
@@ -113,13 +124,13 @@ class RowHICFile:
             'HL7 Group Member',
         ])
 
-    def write_row_practitioner_assignment(self):
+    def write_row_practitioner_assignment(self, is_default: bool):
         return ','.join([
             self.identifier_value[0:-2],
             'Provider_Number', # assignment type code
             self.practitioner_location_code[7:], # location code
             self.identifier_value,
-            'N', # default assignment
+            'Y' if is_default else 'N', # default assignment
             '', # start date
             '', # end date
             'N', # print group
@@ -127,53 +138,36 @@ class RowHICFile:
             'N', # hl7 group
         ])
 
-# def process_file_test(file_location: str): 
-#     with open(file_location, 'r') as file:
-#         print(RowPractitioners.write_row_practitioner_header())
-#         i = 0
-#         for line in file:
-#             row = RowPractitioners(line)
-#             i += 1
-#             if row.address_line_1 == 'LEFT PRACTICE':
-#                 continue
-#             if i == 500:
-#                 break
-#             # if row.identifier_value == '2084955H':
-#             #     print(row.practitioner_location_code)
-#             print(row.write_row_practitioner())
 
-def process_practitioner_file(HIC_file, new_file: str): 
+def get_existing_practitioners(existing_practitioners_file: str) -> set:
+    with open(existing_practitioners_file, 'r') as file_e:
+        existing_practitioners = set()
+        count = 0
+        for line in file_e:
+            count += 1
+            if count == 1:
+                continue
+            existing_practitioners.add(line[:6])
+    return existing_practitioners
+
+
+def process_practitioner_file(HIC_file: str, new_file: str, karisma_practitioners: set): 
     with open(HIC_file, 'r') as file_r, \
     open(new_file, 'w') as file_n:
         file_n.write(RowHICFile.write_row_practitioner_header()+'\n')
-        previous_practitioner_code = ''
+        previous_practitioner_codes = set()
         for line in file_r:
             row = RowHICFile(line)
             if row.address_line_1 == 'LEFT PRACTICE':
                 continue
-            if previous_practitioner_code == row.identifier_value[:-2]:
+            if row.practitioner_code in previous_practitioner_codes:
+                continue
+            if not row.has_valid_specialties():
+                continue
+            if row.practitioner_code in karisma_practitioners:
                 continue
             file_n.write(row.write_row_practitioner()+'\n')
-            previous_practitioner_code = row.identifier_value[:-2]
-
-def new_practitioners(practitioners, karisma_practitioners, import_file: str):
-    with open(practitioners, 'r') as file_p, \
-    open(karisma_practitioners, 'r') as file_k, \
-    open(import_file, 'w') as file_import:
-        file_p_lines = file_p.readlines()
-        file_k_lines = file_k.readlines()
-        practitioners_p_set = set()
-        practitioners_k_set = set()
-        for line in file_p_lines:
-            practitioners_p_set.add(line[:6])
-        for line in file_k_lines:
-            practitioners_k_set.add(line[:6])
-        n_practitioners = practitioners_p_set.symmetric_difference(practitioners_k_set)
-        file_import.write(RowHICFile.write_row_practitioner_header()+'\n')
-        for line in file_p:
-            if line[:6] not in n_practitioners:
-                continue
-            file_import.write(line)
+            previous_practitioner_codes.add(row.practitioner_code)
  
 
 def process_practitioner_location_file(HIC_file, new_file: str):
@@ -187,15 +181,17 @@ def process_practitioner_location_file(HIC_file, new_file: str):
             file_w.write(row.write_row_practitioner_location()+'\n')
 
 
-def process_practitioner_assignment_file(HIC_file, new_file: str):
+def process_practitioner_assignment_file(HIC_file: str, new_file: str):
     with open(HIC_file, 'r') as file_r, \
     open(new_file, 'w') as file_w:
         file_w.write(RowHICFile.write_row_practitioner_assignment_header()+'\n')
+        default_location_assigned = set()
         for line in file_r:
             row = RowHICFile(line)
             if row.address_line_1 == 'LEFT PRACTICE':
                 continue
-            file_w.write(row.write_row_practitioner_assignment()+'\n')
+            file_w.write(row.write_row_practitioner_assignment(row.practitioner_code not in default_location_assigned)+'\n')
+            default_location_assigned.add(row.practitioner_code)
 
 
 NSW_FILE = "C:\\Users\\60035675\\NSW Health Department\\RIS-PACS Program - MS Teams - SCHN Project\\04. Build, Configuration & KRD\\08 Providers\\Medicare NSWFILE\\NSWFILE 20221127\\NSWFILE_Nov.txt"
@@ -209,10 +205,13 @@ Karisma_File = "C:\\Users\\60035675\\Desktop\\Practitioners\\Practitioners from 
 
 #process_practitioner_location_file(NSW_FILE, Practitioner_Location_File)
 
-temp_file = 'temporary_file.csv'
-karisma_practitioners = "practitioners from Karisma.csv"
-import_file = "new practitioners.csv"
+Temp_File = 'temporary_file.csv'
+Karisma_Practitioners = "practitioners from Karisma.csv"
+Import_File = "new practitioners.csv"
 
 #process_practitioner_file(NSW_FILE, temp_file, karisma_practitioners, new_practitioners)
 
-new_practitioners(Practitioner_File, karisma_practitioners, import_file)
+#get_new_practitioners(Practitioner_File, karisma_practitioners, import_file)
+
+existing_practitioners = get_existing_practitioners(Karisma_Practitioners)
+process_practitioner_file(NSW_FILE, Import_File, existing_practitioners)
