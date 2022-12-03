@@ -22,7 +22,7 @@ no_dup_file = "Test_load.csv"
 
 # compare_practitioners(Practitioner_File, Karisma_File, New_Practitioners)
 
-def new_practitioners(practitioners, karisma_practitioners, no_dup_file):
+def create_new_practitioners(practitioners, karisma_practitioners, no_dup_file):
     with open(practitioners, 'r') as file_p, \
     open(karisma_practitioners, 'r') as file_k, \
     open(no_dup_file, 'w') as file_d:
