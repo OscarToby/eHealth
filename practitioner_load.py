@@ -1,4 +1,4 @@
-class RowPractitioners:
+class RowHICFile:
 
     def __init__(self,input_row: str):
 
@@ -49,7 +49,7 @@ class RowPractitioners:
 
     def write_row_practitioner(self):
         return ','.join([
-            self.identifier_value[0:-2],
+            self.identifier_value[:-2],
             '', # expiry date
             self.title,
             f'{self.first_name} {self.middle_name}',
@@ -63,10 +63,28 @@ class RowPractitioners:
             'N', # is contracted
         ])
 
+    @staticmethod
+    def write_row_practitioner_location_header():
+        return ','.join([
+            'Practitioner Location Code',
+            'Name',
+            'Description',
+            'Expiry Date',
+            'Phone',
+            'Fax',
+            'Address Line 1',
+            'Address Line 2',
+            'Address Line 3',
+            'Suburb',
+            'Postcode',
+            'Country',
+            'Email'
+        ])
+
     def write_row_practitioner_location(self):
         return ','.join([
             self.practitioner_location_code,
-            f'{self.address_line_1} {self.address_line_2} {self.suburb}', # name
+            f'{self.address_line_1.title()} {self.address_line_2.title()} {self.suburb.title()}', # name
             f'{self.address_line_1} {self.address_line_2} {self.suburb}', # description
             '', # expiry date
             '', # phone
@@ -80,11 +98,26 @@ class RowPractitioners:
             '', # email
         ])
 
+    @staticmethod
+    def write_row_practitioner_assignment_header():
+        return ','.join([
+            'Practitioner Code',
+            'Assignment Type Code',
+            'Location Code',
+            'Identifier Value',
+            'Is Default Assignment',
+            'Start Date',
+            'End Date',
+            'Print Group Member',
+            'Fax Group Member',
+            'HL7 Group Member',
+        ])
+
     def write_row_practitioner_assignment(self):
         return ','.join([
             self.identifier_value[0:-2],
             'Provider_Number', # assignment type code
-            self.practitioner_location_code[7:],
+            self.practitioner_location_code[7:], # location code
             self.identifier_value,
             'N', # default assignment
             '', # start date
@@ -94,34 +127,92 @@ class RowPractitioners:
             'N', # hl7 group
         ])
 
-def process_file(file_location: str): 
-    with open(file_location, 'r') as file:
-        print(RowPractitioners.write_row_practitioner_header())
-        i = 0
-        for line in file:
-            row = RowPractitioners(line)
-            i += 1
+# def process_file_test(file_location: str): 
+#     with open(file_location, 'r') as file:
+#         print(RowPractitioners.write_row_practitioner_header())
+#         i = 0
+#         for line in file:
+#             row = RowPractitioners(line)
+#             i += 1
+#             if row.address_line_1 == 'LEFT PRACTICE':
+#                 continue
+#             if i == 500:
+#                 break
+#             # if row.identifier_value == '2084955H':
+#             #     print(row.practitioner_location_code)
+#             print(row.write_row_practitioner())
+
+def process_practitioner_file(HIC_file, new_file: str): 
+    with open(HIC_file, 'r') as file_r, \
+    open(new_file, 'w') as file_n:
+        file_n.write(RowHICFile.write_row_practitioner_header()+'\n')
+        previous_practitioner_code = ''
+        for line in file_r:
+            row = RowHICFile(line)
             if row.address_line_1 == 'LEFT PRACTICE':
                 continue
-            if i == 500:
-                break
-            # if row.identifier_value == '2084955H':
-            #     print(row.practitioner_location_code)
-            print(row.write_row_practitioner())
+            if previous_practitioner_code == row.identifier_value[:-2]:
+                continue
+            file_n.write(row.write_row_practitioner()+'\n')
+            previous_practitioner_code = row.identifier_value[:-2]
+
+def new_practitioners(practitioners, karisma_practitioners, import_file: str):
+    with open(practitioners, 'r') as file_p, \
+    open(karisma_practitioners, 'r') as file_k, \
+    open(import_file, 'w') as file_import:
+        file_p_lines = file_p.readlines()
+        file_k_lines = file_k.readlines()
+        practitioners_p_set = set()
+        practitioners_k_set = set()
+        for line in file_p_lines:
+            practitioners_p_set.add(line[:6])
+        for line in file_k_lines:
+            practitioners_k_set.add(line[:6])
+        n_practitioners = practitioners_p_set.symmetric_difference(practitioners_k_set)
+        file_import.write(RowHICFile.write_row_practitioner_header()+'\n')
+        for line in file_p:
+            if line[:6] not in n_practitioners:
+                continue
+            file_import.write(line)
+ 
+
+def process_practitioner_location_file(HIC_file, new_file: str):
+    with open(HIC_file, 'r') as file_r, \
+    open(new_file, 'w') as file_w:
+        file_w.write(RowHICFile.write_row_practitioner_location_header()+'\n')
+        for line in file_r:
+            row = RowHICFile(line)
+            if row.address_line_1 == 'LEFT PRACTICE':
+                continue
+            file_w.write(row.write_row_practitioner_location()+'\n')
+
+
+def process_practitioner_assignment_file(HIC_file, new_file: str):
+    with open(HIC_file, 'r') as file_r, \
+    open(new_file, 'w') as file_w:
+        file_w.write(RowHICFile.write_row_practitioner_assignment_header()+'\n')
+        for line in file_r:
+            row = RowHICFile(line)
+            if row.address_line_1 == 'LEFT PRACTICE':
+                continue
+            file_w.write(row.write_row_practitioner_assignment()+'\n')
+
 
 NSW_FILE = "C:\\Users\\60035675\\NSW Health Department\\RIS-PACS Program - MS Teams - SCHN Project\\04. Build, Configuration & KRD\\08 Providers\\Medicare NSWFILE\\NSWFILE 20221127\\NSWFILE_Nov.txt"
 
-process_file(NSW_FILE)
+Practitioner_File = "Practitioners.csv"
+Practitioner_Location_File = "Practitioner Locations.csv"
+Karisma_File = "C:\\Users\\60035675\\Desktop\\Practitioners\\Practitioners from Karisma.csv"
+#New_Practitioners = 'New Practitioners.csv'
 
-# row = RowPractitioners("ABDEL-MEGEED                  ESAM                                    0070612L18 WOODVALE PL             CASTLE HILL                             2154NSW10454000000000000019760402021167000000000000000000000000000019751822010181DR   ")
-# print(f'Last_name is {row.last_name}')
-# print(f'First_name is {row.first_name}')
-# print(f'Middle_name is {row.middle_name}')
-# print(f'Identifier value is {row.identifier_value}')
-# print(f'Address_line_1 is {row.address_line_1}')
-# print(f'Address_line_2 is {row.address_line_2}')
-# print(f'Suburb is {row.suburb}')
-# print(f'Postcode is {row.postcode}')
-# print(f'State is {row.state}')
-# print(f'Practitioner_specialties is {row.practitioner_specialties}')
-# print(f'Title is {row.title}')
+#process_practitioner_file(NSW_FILE, Practitioner_File)
+
+#process_practitioner_location_file(NSW_FILE, Practitioner_Location_File)
+
+temp_file = 'temporary_file.csv'
+karisma_practitioners = "practitioners from Karisma.csv"
+import_file = "new practitioners.csv"
+
+#process_practitioner_file(NSW_FILE, temp_file, karisma_practitioners, new_practitioners)
+
+new_practitioners(Practitioner_File, karisma_practitioners, import_file)
