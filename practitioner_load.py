@@ -168,15 +168,30 @@ def process_practitioner_file(HIC_file: str, new_file: str, karisma_practitioner
                 continue
             file_n.write(row.get_row_practitioner()+'\n')
             previous_practitioner_codes.add(row.practitioner_code)
- 
 
-def process_practitioner_location_file(HIC_file, new_file: str):
+
+def get_Karisma_practitioner_locations(Karisma_practitioner_locations_extract: str) -> set:
+    with open(Karisma_practitioner_locations_extract, 'r') as file_e:
+        existing_practitioner_locations_set = set()
+        count = 0
+        for line in file_e:
+            count += 1
+            if count == 1:
+                continue
+            existing_practitioner_locations_set.add(line[:8])
+        return existing_practitioner_locations_set
+            
+
+# Need access to data warehouse to get existing identifier values, exlude them and import the rest
+def process_practitioner_location_file(HIC_file: str, new_file: str, karisma_practitioner_locations: set):
     with open(HIC_file, 'r') as file_r, \
     open(new_file, 'w') as file_w:
         file_w.write(RowHICFile.get_row_practitioner_location_header()+'\n')
         for line in file_r:
             row = RowHICFile(line)
             if row.address_line_1 == 'LEFT PRACTICE':
+                continue
+            if row.practitioner_code in karisma_practitioner_locations:
                 continue
             file_w.write(row.get_row_practitioner_location()+'\n')
 
@@ -196,17 +211,19 @@ def process_practitioner_assignment_file(HIC_file: str, new_file: str):
 
 NSW_FILE = "C:\\Users\\60035675\\NSW Health Department\\RIS-PACS Program - MS Teams - SCHN Project\\04. Build, Configuration & KRD\\08 Providers\\Medicare NSWFILE\\NSWFILE 20221127\\NSWFILE_Nov.txt"
 
-Practitioner_File = "Practitioners.csv"
-Practitioner_Location_File = "Practitioner Locations.csv"
-Karisma_File = "C:\\Users\\60035675\\Desktop\\Practitioners\\Practitioners from Karisma.csv"
-
-Temp_File = 'temporary_file.csv'
-Karisma_Practitioners = "practitioners from Karisma.csv"
+Karisma_Practitioners = "Practitioners from Karisma.csv"
 New_Practitioners_For_Karisma = "new practitioners.csv"
 
-#process_practitioner_file(NSW_FILE, temp_file, karisma_practitioners, new_practitioners)
+Karisma_Practitioner_Locations = "practitioner locations from Karisma.csv"
+New_Practitioner_Locations_For_Karisma = "New Practitioner Locations.csv"
 
-#get_new_practitioners(Practitioner_File, karisma_practitioners, import_file)
+Karisma_Practitioner_Location_Assignments = "Practitioner Location Assignments From Karisma.csv"
+New_Practitioner_Assignments = "New Practitioner Assignments.csv"
 
-existing_practitioners_set = get_Karisma_practitioners(Karisma_Practitioners)
-process_practitioner_file(NSW_FILE, New_Practitioners_For_Karisma, existing_practitioners_set)
+# Create new practitioner file to be loaded into Karisma
+# existing_practitioners_set = get_Karisma_practitioners(Karisma_Practitioners)
+# process_practitioner_file(NSW_FILE, New_Practitioners_For_Karisma, existing_practitioners_set)
+
+# Create new practitioner locations file to be loaded into Karisma
+existing_practitioner_location_set = get_Karisma_practitioner_locations(Karisma_Practitioner_Locations)
+process_practitioner_location_file(NSW_FILE, New_Practitioner_Locations_For_Karisma, existing_practitioner_location_set)
