@@ -14,6 +14,9 @@ class RowHICFile:
         self.suburb = input_row[129:145].strip()
         if self.suburb.isnumeric():
             self.suburb = ''
+        if self.suburb == '':
+            self.suburb = self.address_line_2
+            self.address_line_2 = ''
         self.postcode = input_row[145:149]
         self.practitioner_location_code = f'{self.identifier_value}_{self.address_line_1}_{self.address_line_2}_{self.suburb}'
         self.practitioner_location_code = (self.practitioner_location_code
@@ -191,7 +194,7 @@ def process_practitioner_location_file(HIC_file: str, new_file: str, karisma_pra
             row = RowHICFile(line)
             if row.address_line_1 == 'LEFT PRACTICE':
                 continue
-            if row.practitioner_code in karisma_practitioner_locations:
+            if row.identifier_value in karisma_practitioner_locations:
                 continue
             file_w.write(row.get_row_practitioner_location()+'\n')
 
