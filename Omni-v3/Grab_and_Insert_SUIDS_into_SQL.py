@@ -21,7 +21,7 @@ status_id = 30
 for filename in os.listdir(folder_path):
   # Insert the filename into the SQL Server table
   sql = "INSERT INTO sgh_nm (studyuid, status) VALUES (?, ?)"
-  val = (studyuid, status_id)
+  val = (filename, status_id)
   cursor.execute(sql, val)
   cnxn.commit()
 
