@@ -12,7 +12,7 @@ MilleniumMG3 = "N:\\DATA\\SGHNM\\Hermes_Sample\\MilleniumMG\\3\\tmp"
 Symbia = "N:\\DATA\\SGHNM\\Hermes_Sample\\Symbia\\8.P\\tmp"
 
 hermes_sample_folders.extend([AW, BrightView, Ecam, GEXsuite, MilleniumMG1, MilleniumMG2, MilleniumMG3, Symbia])
-# suids = os.listdir(Symbia)
+
 suids_list = []
 status_id = 30
 
@@ -24,7 +24,6 @@ for suids in suids_list:
     for suid in suids:
         flat_suids.append(suid)
     
-# for suid in flat_suids:
-#     sql = f"INSERT INTO OMNI.Omni.sgh_nm (studyuid, status) VALUES ('{suid}', {status_id})"
-#     print(sql)
-print(len(flat_suids))
+for suid in flat_suids:
+    sql = f"INSERT INTO OMNI.Omni.sgh_nm (studyuid, status) VALUES ('{suid}', {status_id})"
+    print(sql)
